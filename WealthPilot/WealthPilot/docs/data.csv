@@ -1,0 +1,10 @@
+profile,option,description,min_investment,expected_return
+Conservador,Tesouro Selic,Titulo publico pos-fixado com liquidez diaria,100,IPCA+ ~6% a.a.
+Conservador,CDB Liquidez Diaria,Renda fixa bancaria com garantia do FGC,500,100% do CDI
+Conservador,LCI/LCA,Isento de IR pessoa fisica,1000,90% do CDI
+Moderado,Fundo Multimercado,Mix de renda fixa e variavel com gestao ativa,1000,CDI + 2% a.a.
+Moderado,Tesouro IPCA+,Protecao contra inflacao no longo prazo,100,IPCA+ ~6.5% a.a.
+Moderado,ETF Dividendos,Cesta diversificada de acoes pagadoras de dividendos,200,~8% a.a. historico
+Arrojado,Acoes Blue Chips,Empresas consolidadas de alta liquidez,500,Variavel
+Arrojado,Fundos de Acoes,Gestao ativa focada em crescimento,1000,Variavel
+Arrojado,Criptoativos (ETF),Exposicao regulada a criptomoedas,300,Alta volatilidade

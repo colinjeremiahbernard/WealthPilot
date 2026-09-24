@@ -1,0 +1,225 @@
+{
+  "name": "WealthPilot",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "investment-assistant",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "id": "webhook-1",
+      "name": "Webhook - Receive Clients",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [200, 300],
+      "webhookId": "investment-assistant"
+    },
+    {
+      "parameters": {
+        "url": "https://<your-username>.github.io/dio-lab-assistente-investimentos-rpa-n8n/data.csv",
+        "options": {}
+      },
+      "id": "http-fetch-csv",
+      "name": "Fetch Investment Options (CSV)",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [200, 500]
+    },
+    {
+      "parameters": {
+        "jsCode": "const csvText = $input.first().json.data || $input.first().binary?.data;\nconst raw = typeof csvText === 'string' ? csvText : $input.first().json.toString();\n\nconst lines = raw.trim().split('\\n');\nconst headers = lines[0].split(',');\n\nconst options = lines.slice(1).map(line => {\n  const cols = line.split(',');\n  const row = {};\n  headers.forEach((h, i) => row[h.trim()] = (cols[i] || '').trim());\n  return row;\n});\n\nreturn [{ json: { options } }];"
+      },
+      "id": "code-parse-csv",
+      "name": "Parse CSV",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [420, 500]
+    },
+    {
+      "parameters": {
+        "fieldToSplitOut": "clients",
+        "options": {}
+      },
+      "id": "split-clients",
+      "name": "Split Out Clients",
+      "type": "n8n-nodes-base.splitOut",
+      "typeVersion": 1,
+      "position": [420, 300]
+    },
+    {
+      "parameters": {
+        "jsCode": "const client = $input.item.json;\nconst allOptions = $('Parse CSV').first().json.options;\n\nconst matches = allOptions.filter(o => o.profile === client.profile);\n\nreturn [{\n  json: {\n    ...client,\n    matched_options: matches\n  }\n}];"
+      },
+      "id": "code-match-profile",
+      "name": "Match Profile to Options",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [640, 400]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict"
+          },
+          "conditions": [
+            {
+              "leftValue": "={{ $env.USE_AI_MESSAGES }}",
+              "rightValue": "true",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "if-use-ai",
+      "name": "Use AI Messages?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [860, 400]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.anthropic.com/v1/messages",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "anthropicApi",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "anthropic-version", "value": "2023-06-01" },
+            { "name": "content-type", "value": "application/json" }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ {\n  model: \"claude-sonnet-4-6\",\n  max_tokens: 300,\n  messages: [{\n    role: \"user\",\n    content: `Escreva uma mensagem curta e personalizada (em portugues, tom consultivo e amigavel) recomendando investimentos para ${$json.name}, perfil ${$json.profile}, saldo R$ ${$json.balance}. Opcoes disponiveis: ${JSON.stringify($json.matched_options)}. Nao invente numeros fora das opcoes fornecidas.`\n  }]\n} }}"
+      },
+      "id": "ai-generate-message",
+      "name": "AI Agent - Generate Message",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [1080, 300]
+    },
+    {
+      "parameters": {
+        "jsCode": "const text = $json.content?.[0]?.text || 'Nao foi possivel gerar a mensagem.';\nreturn [{ json: { ...$('Match Profile to Options').item.json, message: text, source: 'ai' } }];"
+      },
+      "id": "code-extract-ai-text",
+      "name": "Extract AI Message",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1300, 300]
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "name": "message",
+              "type": "string",
+              "value": "={{ { 'Conservador': `Ola ${$json.name}, para o seu perfil conservador recomendamos foco em renda fixa de baixo risco, como ${$json.matched_options[0]?.option}.`, 'Moderado': `Ola ${$json.name}, para o seu perfil moderado sugerimos um mix equilibrado, como ${$json.matched_options[0]?.option}.`, 'Arrojado': `Ola ${$json.name}, para o seu perfil arrojado indicamos maior exposicao a renda variavel, como ${$json.matched_options[0]?.option}.` }[$json.profile] }}"
+            },
+            {
+              "name": "source",
+              "type": "string",
+              "value": "static"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "set-static-message",
+      "name": "Static Message Template",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [1080, 500]
+    },
+    {
+      "parameters": {
+        "mode": "combine",
+        "options": {}
+      },
+      "id": "merge-branches",
+      "name": "Merge",
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 3,
+      "position": [1520, 400]
+    },
+    {
+      "parameters": {
+        "aggregate": "aggregateAllItemData",
+        "options": {}
+      },
+      "id": "aggregate-results",
+      "name": "Aggregate Messages",
+      "type": "n8n-nodes-base.aggregate",
+      "typeVersion": 1,
+      "position": [1740, 400]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ { \"status\": \"ok\", \"count\": $json.data.length, \"messages\": $json.data } }}",
+        "options": {}
+      },
+      "id": "respond-webhook",
+      "name": "Respond to Webhook",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [1960, 400]
+    }
+  ],
+  "connections": {
+    "Webhook - Receive Clients": {
+      "main": [[
+        { "node": "Split Out Clients", "type": "main", "index": 0 },
+        { "node": "Fetch Investment Options (CSV)", "type": "main", "index": 0 }
+      ]]
+    },
+    "Fetch Investment Options (CSV)": {
+      "main": [[{ "node": "Parse CSV", "type": "main", "index": 0 }]]
+    },
+    "Split Out Clients": {
+      "main": [[{ "node": "Match Profile to Options", "type": "main", "index": 0 }]]
+    },
+    "Parse CSV": {
+      "main": [[{ "node": "Match Profile to Options", "type": "main", "index": 0 }]]
+    },
+    "Match Profile to Options": {
+      "main": [[{ "node": "Use AI Messages?", "type": "main", "index": 0 }]]
+    },
+    "Use AI Messages?": {
+      "main": [
+        [{ "node": "AI Agent - Generate Message", "type": "main", "index": 0 }],
+        [{ "node": "Static Message Template", "type": "main", "index": 0 }]
+      ]
+    },
+    "AI Agent - Generate Message": {
+      "main": [[{ "node": "Extract AI Message", "type": "main", "index": 0 }]]
+    },
+    "Extract AI Message": {
+      "main": [[{ "node": "Merge", "type": "main", "index": 0 }]]
+    },
+    "Static Message Template": {
+      "main": [[{ "node": "Merge", "type": "main", "index": 1 }]]
+    },
+    "Merge": {
+      "main": [[{ "node": "Aggregate Messages", "type": "main", "index": 0 }]]
+    },
+    "Aggregate Messages": {
+      "main": [[{ "node": "Respond to Webhook", "type": "main", "index": 0 }]]
+    }
+  },
+  "pinData": {},
+  "meta": {
+    "instanceId": "investment-assistant-rpa"
+  }
+}
