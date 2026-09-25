@@ -17,18 +17,7 @@
     },
     {
       "parameters": {
-        "url": "https://<your-username>.github.io/dio-lab-assistente-investimentos-rpa-n8n/data.csv",
-        "options": {}
-      },
-      "id": "http-fetch-csv",
-      "name": "Fetch Investment Options (CSV)",
-      "type": "n8n-nodes-base.httpRequest",
-      "typeVersion": 4.2,
-      "position": [200, 500]
-    },
-    {
-      "parameters": {
-        "jsCode": "const csvText = $input.first().json.data || $input.first().binary?.data;\nconst raw = typeof csvText === 'string' ? csvText : $input.first().json.toString();\n\nconst lines = raw.trim().split('\\n');\nconst headers = lines[0].split(',');\n\nconst options = lines.slice(1).map(line => {\n  const cols = line.split(',');\n  const row = {};\n  headers.forEach((h, i) => row[h.trim()] = (cols[i] || '').trim());\n  return row;\n});\n\nreturn [{ json: { options } }];"
+        "jsCode": "// Investment options are embedded here — no external hosting required.\n// To update options, edit the csvText string below and re-import the workflow.\nconst csvText = `profile,option,description,min_investment,expected_return\nConservador,Tesouro Selic,Titulo publico pos-fixado com liquidez diaria,100,IPCA+ ~6% a.a.\nConservador,CDB Liquidez Diaria,Renda fixa bancaria com garantia do FGC,500,100% do CDI\nConservador,LCI/LCA,Isento de IR pessoa fisica,1000,90% do CDI\nModerado,Fundo Multimercado,Mix de renda fixa e variavel com gestao ativa,1000,CDI + 2% a.a.\nModerado,Tesouro IPCA+,Protecao contra inflacao no longo prazo,100,IPCA+ ~6.5% a.a.\nModerado,ETF Dividendos,Cesta diversificada de acoes pagadoras de dividendos,200,~8% a.a. historico\nArrojado,Acoes Blue Chips,Empresas consolidadas de alta liquidez,500,Variavel\nArrojado,Fundos de Acoes,Gestao ativa focada em crescimento,1000,Variavel\nArrojado,Criptoativos (ETF),Exposicao regulada a criptomoedas,300,Alta volatilidade`;\n\nconst lines = csvText.trim().split('\\n');\nconst headers = lines[0].split(',');\n\nconst options = lines.slice(1).map(line => {\n  const cols = line.split(',');\n  const row = {};\n  headers.forEach((h, i) => row[h.trim()] = (cols[i] || '').trim());\n  return row;\n});\n\nreturn [{ json: { options } }];"
       },
       "id": "code-parse-csv",
       "name": "Parse CSV",
@@ -181,11 +170,8 @@
     "Webhook - Receive Clients": {
       "main": [[
         { "node": "Split Out Clients", "type": "main", "index": 0 },
-        { "node": "Fetch Investment Options (CSV)", "type": "main", "index": 0 }
+        { "node": "Parse CSV", "type": "main", "index": 0 }
       ]]
-    },
-    "Fetch Investment Options (CSV)": {
-      "main": [[{ "node": "Parse CSV", "type": "main", "index": 0 }]]
     },
     "Split Out Clients": {
       "main": [[{ "node": "Match Profile to Options", "type": "main", "index": 0 }]]
