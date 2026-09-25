@@ -50,13 +50,13 @@
       "parameters": {
         "conditions": {
           "options": {
-            "caseSensitive": true,
+            "caseSensitive": false,
             "leftValue": "",
-            "typeValidation": "strict"
+            "typeValidation": "loose"
           },
           "conditions": [
             {
-              "leftValue": "={{ $env.USE_AI_MESSAGES }}",
+              "leftValue": "={{ $env.USE_AI_MESSAGES ?? '' }}",
               "rightValue": "true",
               "operator": {
                 "type": "string",
