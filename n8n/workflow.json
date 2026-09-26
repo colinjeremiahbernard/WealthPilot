@@ -1,5 +1,11 @@
 {
+  "updatedAt": "2026-09-26T01:03:06.000Z",
+  "createdAt": "2026-09-25T23:05:30.298Z",
+  "id": "DZ9VDLR1sWgTIgze",
   "name": "WealthPilot",
+  "description": null,
+  "active": true,
+  "isArchived": false,
   "nodes": [
     {
       "parameters": {
@@ -8,56 +14,83 @@
         "responseMode": "responseNode",
         "options": {}
       },
-      "id": "webhook-1",
+      "id": "19f4052a-00fd-4fab-8caf-73f282c15dcd",
       "name": "Webhook - Receive Clients",
       "type": "n8n-nodes-base.webhook",
       "typeVersion": 2,
-      "position": [200, 300],
+      "position": [
+        0,
+        0
+      ],
       "webhookId": "investment-assistant"
     },
     {
       "parameters": {
-        "jsCode": "// Investment options are embedded here — no external hosting required.\n// To update options, edit the csvText string below and re-import the workflow.\nconst csvText = `profile,option,description,min_investment,expected_return\nConservador,Tesouro Selic,Titulo publico pos-fixado com liquidez diaria,100,IPCA+ ~6% a.a.\nConservador,CDB Liquidez Diaria,Renda fixa bancaria com garantia do FGC,500,100% do CDI\nConservador,LCI/LCA,Isento de IR pessoa fisica,1000,90% do CDI\nModerado,Fundo Multimercado,Mix de renda fixa e variavel com gestao ativa,1000,CDI + 2% a.a.\nModerado,Tesouro IPCA+,Protecao contra inflacao no longo prazo,100,IPCA+ ~6.5% a.a.\nModerado,ETF Dividendos,Cesta diversificada de acoes pagadoras de dividendos,200,~8% a.a. historico\nArrojado,Acoes Blue Chips,Empresas consolidadas de alta liquidez,500,Variavel\nArrojado,Fundos de Acoes,Gestao ativa focada em crescimento,1000,Variavel\nArrojado,Criptoativos (ETF),Exposicao regulada a criptomoedas,300,Alta volatilidade`;\n\nconst lines = csvText.trim().split('\\n');\nconst headers = lines[0].split(',');\n\nconst options = lines.slice(1).map(line => {\n  const cols = line.split(',');\n  const row = {};\n  headers.forEach((h, i) => row[h.trim()] = (cols[i] || '').trim());\n  return row;\n});\n\nreturn [{ json: { options } }];"
+        "url": "https://raw.githubusercontent.com/colinjeremiahbernard/WealthPilot/main/docs/data.csv",
+        "options": {}
       },
-      "id": "code-parse-csv",
+      "id": "35c87186-21c1-444d-9ef7-ddb96517355e",
+      "name": "Fetch Investment Options (CSV)",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        0,
+        208
+      ],
+      "retryOnFail": true
+    },
+    {
+      "parameters": {
+        "jsCode": "const csvText = $input.first().json.data || $input.first().binary?.data;\nconst raw = typeof csvText === 'string' ? csvText : $input.first().json.toString();\n\nconst lines = raw.trim().split('\\n');\nconst headers = lines[0].split(',');\n\nconst options = lines.slice(1).map(line => {\n  const cols = line.split(',');\n  const row = {};\n  headers.forEach((h, i) => row[h.trim()] = (cols[i] || '').trim());\n  return row;\n});\n\nreturn [{ json: { options } }];"
+      },
+      "id": "6e151682-8f17-4fdf-a869-b2ff407bec10",
       "name": "Parse CSV",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
-      "position": [420, 500]
+      "position": [
+        224,
+        208
+      ]
     },
     {
       "parameters": {
         "fieldToSplitOut": "clients",
         "options": {}
       },
-      "id": "split-clients",
+      "id": "2a5df5a9-c64e-4a94-93de-fb9a8c8421e4",
       "name": "Split Out Clients",
       "type": "n8n-nodes-base.splitOut",
       "typeVersion": 1,
-      "position": [420, 300]
+      "position": [
+        224,
+        0
+      ]
     },
     {
       "parameters": {
-        "jsCode": "const client = $input.item.json;\nconst allOptions = $('Parse CSV').first().json.options;\n\nconst matches = allOptions.filter(o => o.profile === client.profile);\n\nreturn [{\n  json: {\n    ...client,\n    matched_options: matches\n  }\n}];"
+        "jsCode": "const rawInput = $input.first();\nlet rawCsv = \"\";\nif (typeof rawInput.json.data === \"string\") {\n  rawCsv = rawInput.json.data;\n} else if (typeof rawInput.json === \"string\") {\n  rawCsv = rawInput.json;\n} else if (rawInput.binary?.data) {\n  rawCsv = rawInput.binary.data;\n} else {\n  rawCsv = JSON.stringify(rawInput.json);\n}\n\nconst lines = rawCsv.trim().split(/\\r?\\n/);\nconst headers = lines[0].split(\",\").map(h => h.trim());\nconst options = lines.slice(1).map(line => {\n  const cols = line.split(\",\");\n  const row = {};\n  headers.forEach((h, i) => row[h] = (cols[i] || \"\").trim());\n  return row;\n});\n\nconst webhookJson = $('Webhook - Receive Clients').first().json;\nconst clients = webhookJson.body?.clients || webhookJson.clients || [];\n\nreturn clients.map(client => {\n  const matches = options.filter(o => o.profile === client.profile);\n  return {\n    json: {\n      ...client,\n      matched_options: matches\n    }\n  };\n});"
       },
-      "id": "code-match-profile",
+      "id": "34f87d86-d005-457d-a762-c0b32587f1f5",
       "name": "Match Profile to Options",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
-      "position": [640, 400]
+      "position": [
+        448,
+        112
+      ]
     },
     {
       "parameters": {
         "conditions": {
           "options": {
-            "caseSensitive": false,
+            "caseSensitive": true,
             "leftValue": "",
             "typeValidation": "loose"
           },
           "conditions": [
             {
-              "leftValue": "={{ $env.USE_AI_MESSAGES ?? '' }}",
-              "rightValue": "true",
+              "leftValue": "={{ $env.USE_AI_MESSAGES }}",
+              "rightValue": "never",
               "operator": {
                 "type": "string",
                 "operation": "equals"
@@ -68,91 +101,108 @@
         },
         "options": {}
       },
-      "id": "if-use-ai",
+      "id": "1738b982-f01c-40ff-90c0-a989e112ebf0",
       "name": "Use AI Messages?",
       "type": "n8n-nodes-base.if",
       "typeVersion": 2,
-      "position": [860, 400]
+      "position": [
+        672,
+        112
+      ]
     },
     {
       "parameters": {
         "method": "POST",
         "url": "https://api.anthropic.com/v1/messages",
-        "authentication": "genericCredentialType",
-        "genericAuthType": "httpHeaderAuth",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "anthropicApi",
         "sendHeaders": true,
         "headerParameters": {
           "parameters": [
-            { "name": "x-api-key", "value": "={{ $env.ANTHROPIC_API_KEY }}" },
-            { "name": "anthropic-version", "value": "2023-06-01" },
-            { "name": "content-type", "value": "application/json" }
+            {
+              "name": "anthropic-version",
+              "value": "2023-06-01"
+            },
+            {
+              "name": "content-type",
+              "value": "application/json"
+            }
           ]
         },
         "sendBody": true,
         "specifyBody": "json",
-        "jsonBody": "={{ {\n  model: \"claude-sonnet-4-5\",\n  max_tokens: 300,\n  messages: [{\n    role: \"user\",\n    content: `Escreva uma mensagem curta e personalizada (em portugues, tom consultivo e amigavel) recomendando investimentos para ${$json.name}, perfil ${$json.profile}, saldo R$ ${$json.balance}. Opcoes disponiveis: ${JSON.stringify($json.matched_options)}. Nao invente numeros fora das opcoes fornecidas.`\n  }]\n} }}"
+        "jsonBody": "={{ {\n  model: \"claude-sonnet-4-6\",\n  max_tokens: 300,\n  messages: [{\n    role: \"user\",\n    content: `Escreva uma mensagem curta e personalizada (em portugues, tom consultivo e amigavel) recomendando investimentos para ${$json.name}, perfil ${$json.profile}, saldo R$ ${$json.balance}. Opcoes disponiveis: ${JSON.stringify($json.matched_options)}. Nao invente numeros fora das opcoes fornecidas.`\n  }]\n} }}",
+        "options": {}
       },
-      "id": "ai-generate-message",
+      "id": "b97819f3-3efa-4e42-8d89-ecd9ed0df26b",
       "name": "AI Agent - Generate Message",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
-      "position": [1080, 300]
+      "position": [
+        880,
+        0
+      ],
+      "credentials": {
+        "anthropicApi": {
+          "id": "nCtpe10LIml2ypXZ",
+          "name": "Anthropic account"
+        }
+      },
+      "continueOnFail": true
     },
     {
       "parameters": {
-        "jsCode": "const text = $json.content?.[0]?.text || 'Nao foi possivel gerar a mensagem.';\nreturn [{ json: { ...$('Match Profile to Options').item.json, message: text, source: 'ai' } }];"
+        "jsCode": "const matchItems = $('Match Profile to Options').all();\nreturn $input.all().map((inputItem, index) => {\n  const item = matchItems[index]?.json || {};\n  const text = inputItem.json.content?.[0]?.text;\n  if (text) {\n    return { json: { ...item, message: text, source: \"ai\" } };\n  }\n  const templates = {\n    \"Conservador\": `Ola ${item.name}, para o seu perfil conservador recomendamos foco em renda fixa de baixo risco, como ${item.matched_options?.[0]?.option}.`,\n    \"Moderado\": `Ola ${item.name}, para o seu perfil moderado sugerimos um mix equilibrado, como ${item.matched_options?.[0]?.option}.`,\n    \"Arrojado\": `Ola ${item.name}, para o seu perfil arrojado indicamos maior exposicao a renda variavel, como ${item.matched_options?.[0]?.option}.`\n  };\n  return { json: { ...item, message: templates[item.profile] || \"Recomendacao indisponivel.\", source: \"static-fallback\" } };\n});"
       },
-      "id": "code-extract-ai-text",
+      "id": "f45151b8-5c39-47fc-810b-3723e375d2dc",
       "name": "Extract AI Message",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
-      "position": [1300, 300]
+      "position": [
+        1104,
+        0
+      ]
     },
     {
       "parameters": {
-        "assignments": {
-          "assignments": [
-            {
-              "name": "message",
-              "type": "string",
-              "value": "={{ { 'Conservador': `Ola ${$json.name}, para o seu perfil conservador recomendamos foco em renda fixa de baixo risco, como ${$json.matched_options[0]?.option}.`, 'Moderado': `Ola ${$json.name}, para o seu perfil moderado sugerimos um mix equilibrado, como ${$json.matched_options[0]?.option}.`, 'Arrojado': `Ola ${$json.name}, para o seu perfil arrojado indicamos maior exposicao a renda variavel, como ${$json.matched_options[0]?.option}.` }[$json.profile] }}"
-            },
-            {
-              "name": "source",
-              "type": "string",
-              "value": "static"
-            }
-          ]
-        },
-        "options": {}
+        "jsCode": "const templates = {\n  'Conservador': (name, opt) => `Ola ${name}, para o seu perfil conservador recomendamos foco em renda fixa de baixo risco, como ${opt}.`,\n  'Moderado': (name, opt) => `Ola ${name}, para o seu perfil moderado sugerimos um mix equilibrado, como ${opt}.`,\n  'Arrojado': (name, opt) => `Ola ${name}, para o seu perfil arrojado indicamos maior exposicao a renda variavel, como ${opt}.`\n};\n\nreturn $input.all().map(item => {\n  const json = item.json;\n  const opt = json.matched_options?.[0]?.option || 'opcoes disponiveis';\n  const fn = templates[json.profile] || templates['Conservador'];\n  return {\n    json: {\n      ...json,\n      message: fn(json.name, opt),\n      source: 'static'\n    }\n  };\n});"
       },
-      "id": "set-static-message",
+      "id": "4f955bd3-b3bf-4e3d-9b19-7738ae5eafa5",
       "name": "Static Message Template",
-      "type": "n8n-nodes-base.set",
-      "typeVersion": 3.4,
-      "position": [1080, 500]
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        880,
+        208
+      ]
     },
     {
       "parameters": {
-        "mode": "combine",
+        "mode": "append",
         "options": {}
       },
-      "id": "merge-branches",
+      "id": "359b5b0c-3ef5-4437-a3e0-6bebdb560116",
       "name": "Merge",
       "type": "n8n-nodes-base.merge",
       "typeVersion": 3,
-      "position": [1520, 400]
+      "position": [
+        1328,
+        112
+      ]
     },
     {
       "parameters": {
         "aggregate": "aggregateAllItemData",
         "options": {}
       },
-      "id": "aggregate-results",
+      "id": "9e1246f4-6f1b-4533-b0a5-504a2c7d2154",
       "name": "Aggregate Messages",
       "type": "n8n-nodes-base.aggregate",
       "typeVersion": 1,
-      "position": [1740, 400]
+      "position": [
+        1552,
+        112
+      ]
     },
     {
       "parameters": {
@@ -160,53 +210,160 @@
         "responseBody": "={{ { \"status\": \"ok\", \"count\": $json.data.length, \"messages\": $json.data } }}",
         "options": {}
       },
-      "id": "respond-webhook",
+      "id": "98be44bc-92eb-404b-bd74-c04981ac8832",
       "name": "Respond to Webhook",
       "type": "n8n-nodes-base.respondToWebhook",
       "typeVersion": 1.1,
-      "position": [1960, 400]
+      "position": [
+        1760,
+        112
+      ]
     }
   ],
   "connections": {
     "Webhook - Receive Clients": {
-      "main": [[
-        { "node": "Split Out Clients", "type": "main", "index": 0 },
-        { "node": "Parse CSV", "type": "main", "index": 0 }
-      ]]
+      "main": [
+        [
+          {
+            "node": "Fetch Investment Options (CSV)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
     },
-    "Split Out Clients": {
-      "main": [[{ "node": "Match Profile to Options", "type": "main", "index": 0 }]]
-    },
-    "Parse CSV": {
-      "main": [[{ "node": "Match Profile to Options", "type": "main", "index": 0 }]]
+    "Fetch Investment Options (CSV)": {
+      "main": [
+        [
+          {
+            "node": "Match Profile to Options",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
     },
     "Match Profile to Options": {
-      "main": [[{ "node": "Use AI Messages?", "type": "main", "index": 0 }]]
+      "main": [
+        [
+          {
+            "node": "Use AI Messages?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
     },
     "Use AI Messages?": {
       "main": [
-        [{ "node": "AI Agent - Generate Message", "type": "main", "index": 0 }],
-        [{ "node": "Static Message Template", "type": "main", "index": 0 }]
+        [
+          {
+            "node": "AI Agent - Generate Message",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Static Message Template",
+            "type": "main",
+            "index": 0
+          }
+        ]
       ]
     },
     "AI Agent - Generate Message": {
-      "main": [[{ "node": "Extract AI Message", "type": "main", "index": 0 }]]
+      "main": [
+        [
+          {
+            "node": "Extract AI Message",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
     },
     "Extract AI Message": {
-      "main": [[{ "node": "Merge", "type": "main", "index": 0 }]]
+      "main": [
+        [
+          {
+            "node": "Merge",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
     },
     "Static Message Template": {
-      "main": [[{ "node": "Merge", "type": "main", "index": 1 }]]
+      "main": [
+        [
+          {
+            "node": "Merge",
+            "type": "main",
+            "index": 1
+          }
+        ]
+      ]
     },
     "Merge": {
-      "main": [[{ "node": "Aggregate Messages", "type": "main", "index": 0 }]]
+      "main": [
+        [
+          {
+            "node": "Aggregate Messages",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
     },
     "Aggregate Messages": {
-      "main": [[{ "node": "Respond to Webhook", "type": "main", "index": 0 }]]
+      "main": [
+        [
+          {
+            "node": "Respond to Webhook",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
     }
   },
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate"
+  },
+  "staticData": null,
+  "meta": null,
+  "nodeGroups": [],
   "pinData": {},
-  "meta": {
-    "instanceId": "investment-assistant-rpa"
+  "versionId": "e5549a27-e8c5-4dad-bfec-963ac1972c44",
+  "activeVersionId": "e5549a27-e8c5-4dad-bfec-963ac1972c44",
+  "versionCounter": 34,
+  "triggerCount": 1,
+  "sourceWorkflowId": null,
+  "tags": [],
+  "shared": [
+    {
+      "updatedAt": "2026-09-25T23:05:30.307Z",
+      "createdAt": "2026-09-25T23:05:30.307Z",
+      "role": "workflow:owner",
+      "workflowId": "DZ9VDLR1sWgTIgze",
+      "projectId": "phV1cnHn2AUeHvUm",
+      "project": {
+        "updatedAt": "2026-09-25T22:55:46.551Z",
+        "createdAt": "2026-08-31T17:25:23.653Z",
+        "id": "phV1cnHn2AUeHvUm",
+        "name": "Colin Stephenson <colinjeremiahbernard@gmail.com>",
+        "type": "personal",
+        "icon": null,
+        "description": null,
+        "customTelemetryTags": [],
+        "creatorId": "698d2f68-9230-4281-9db4-de993b241516"
+      }
+    }
+  ],
+  "versionMetadata": {
+    "name": "Version 6068906f",
+    "description": ""
   }
 }
